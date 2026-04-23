@@ -109,23 +109,13 @@
         <section class="checkout-step" hidden>
           <div class="checkout-step-head">
             <h3>Payment method</h3>
-            <p>Select how you want to pay for the order.</p>
+            <p>Stripe will securely process your card payment after you review the order.</p>
           </div>
           <div class="checkout-choice-grid">
             <label class="checkout-choice-card">
-              <input type="radio" name="paymentMethod" value="Card" required />
-              <span>Card</span>
-              <small>Pay with Visa or Mastercard.</small>
-            </label>
-            <label class="checkout-choice-card">
-              <input type="radio" name="paymentMethod" value="PayPal" />
-              <span>PayPal</span>
-              <small>Use your PayPal balance or card.</small>
-            </label>
-            <label class="checkout-choice-card">
-              <input type="radio" name="paymentMethod" value="Bank Transfer" />
-              <span>Bank Transfer</span>
-              <small>Receive bank details after placing the order.</small>
+              <input type="radio" name="paymentMethod" value="Card" required checked />
+              <span>Card via Stripe</span>
+              <small>Pay securely with Visa or Mastercard on Stripe.</small>
             </label>
           </div>
 
@@ -184,7 +174,7 @@
       <div class="checkout-actions">
         <button type="button" class="checkout-secondary-button" data-checkout-back hidden>Back</button>
         <button type="button" class="checkout-primary-button" data-checkout-next>Continue</button>
-        <button type="button" class="checkout-primary-button" data-checkout-submit hidden>Place Order</button>
+        <button type="button" class="checkout-primary-button" data-checkout-submit hidden>Continue to Payment</button>
       </div>
     </div>
 

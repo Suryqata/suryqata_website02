@@ -573,7 +573,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		if (submitButton) {
 			submitButton.addEventListener("click", function () {
 				var stepIndex;
-				var finalizedOrderNumber;
+				var checkoutData;
 
 				for (stepIndex = 0; stepIndex < steps.length; stepIndex += 1) {
 					if (!validateCheckoutStep(stepIndex)) {
@@ -588,31 +588,28 @@ document.addEventListener("DOMContentLoaded", function () {
 					return;
 				}
 
-				finalizedOrderNumber = generateOrderNumber();
-				placedOrder = {
-					orderNumber: finalizedOrderNumber,
-					placedAt: new Date().toISOString(),
-					formData: collectCheckoutData(form),
-					items: cart.map(function (entry) {
-						return Object.assign({}, entry);
-					})
-				};
-				invoiceNumber = finalizedOrderNumber;
-				persistLatestOrder(placedOrder);
+				checkoutData = collectCheckoutData(form);
+				submitButton.disabled = true;
+				setCheckoutMessage("Redirecting to Stripe...");
 
-				if (confirmationOrder) {
-					confirmationOrder.textContent = finalizedOrderNumber;
-				}
+				requestJson("/api/payments/create-checkout-session", {
+					method: "POST",
+					body: {
+						cart: cart,
+						formData: checkoutData
+					}
+				}).then(function (response) {
+					if (!response.ok || !response.data || !response.data.url) {
+						setCheckoutMessage(response.error || "Unable to start Stripe checkout right now.");
+						submitButton.disabled = false;
+						return;
+					}
 
-				cart = [];
-				persistCart();
-				persistCheckoutState({});
-				resetInvoicePreview();
-				updateInvoiceActionState();
-				renderCart();
-				renderCheckoutSummary();
-				clearCheckoutMessage();
-				window.location.href = "thank-you.html";
+					window.location.href = response.data.url;
+				}).catch(function () {
+					setCheckoutMessage("Unable to contact the payment server right now.");
+					submitButton.disabled = false;
+				});
 			});
 		}
 
@@ -1064,19 +1061,52 @@ document.addEventListener("DOMContentLoaded", function () {
 		var invoicePlaceholder = thankYouPage.querySelector("[data-invoice-placeholder]");
 		var invoiceFrame = thankYouPage.querySelector("[data-invoice-frame]");
 		var order = loadLatestOrder();
+		var sessionId = new URLSearchParams(window.location.search).get("session_id") || "";
 		var invoicePreviewUrl = "";
 
-		if (!order || !order.items || !order.items.length) {
+		function setThankYouUnavailable(statusText, placeholderText) {
 			if (orderReference) {
 				orderReference.textContent = "Unavailable";
 			}
 
 			if (invoiceStatus) {
-				invoiceStatus.textContent = "No recent order was found. Place a new order to generate an invoice.";
+				invoiceStatus.textContent = statusText;
 			}
 
 			if (invoicePlaceholder) {
-				invoicePlaceholder.textContent = "No invoice is available yet.";
+				invoicePlaceholder.textContent = placeholderText;
+			}
+
+			if (invoicePreviewButton) {
+				invoicePreviewButton.disabled = true;
+			}
+
+			if (invoiceDownloadButton) {
+				invoiceDownloadButton.disabled = true;
+			}
+		}
+
+		function setThankYouReady(statusText) {
+			if (orderReference) {
+				orderReference.textContent = order.orderNumber || generateOrderNumber();
+			}
+
+			if (invoiceStatus) {
+				invoiceStatus.textContent = statusText;
+			}
+
+			if (invoicePreviewButton) {
+				invoicePreviewButton.disabled = false;
+			}
+
+			if (invoiceDownloadButton) {
+				invoiceDownloadButton.disabled = false;
+			}
+		}
+
+		if (sessionId) {
+			if (invoiceStatus) {
+				invoiceStatus.textContent = "Verifying your Stripe payment...";
 			}
 
 			if (invoicePreviewButton) {
@@ -1087,15 +1117,35 @@ document.addEventListener("DOMContentLoaded", function () {
 				invoiceDownloadButton.disabled = true;
 			}
 
-			return;
-		}
+			requestJson("/api/payments/session?session_id=" + encodeURIComponent(sessionId)).then(function (response) {
+				if (!response.ok || !response.data || !response.data.items || !response.data.items.length) {
+					setThankYouUnavailable(
+						response.error || "We could not verify the Stripe payment.",
+						"Payment verification failed. Return to checkout and try again."
+					);
+					return;
+				}
 
-		if (orderReference) {
-			orderReference.textContent = order.orderNumber || generateOrderNumber();
-		}
-
-		if (invoiceStatus) {
-			invoiceStatus.textContent = "Your invoice is ready to preview and download.";
+				order = response.data;
+				persistLatestOrder(order);
+				cart = [];
+				persistCart();
+				persistCheckoutState({});
+				renderCart();
+				setThankYouReady("Your Stripe payment was confirmed. Your invoice is ready to preview and download.");
+			}).catch(function () {
+				setThankYouUnavailable(
+					"We could not reach the payment verification server.",
+					"Payment verification failed. Return to checkout and try again."
+				);
+			});
+		} else if (!order || !order.items || !order.items.length) {
+			setThankYouUnavailable(
+				"No recent order was found. Place a new order to generate an invoice.",
+				"No invoice is available yet."
+			);
+		} else {
+			setThankYouReady("Your invoice is ready to preview and download.");
 		}
 
 		if (invoicePreviewButton) {

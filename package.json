@@ -10,7 +10,8 @@
     "start": "node build"
   },
   "dependencies": {
-    "@sveltejs/adapter-node": "^5.2.12"
+    "@sveltejs/adapter-node": "^5.2.12",
+    "stripe": "^22.0.2"
   },
   "devDependencies": {
     "@sveltejs/kit": "^2.15.2",
