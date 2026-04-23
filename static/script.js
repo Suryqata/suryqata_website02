@@ -487,6 +487,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		var invoicePlaceholder = checkoutPage.querySelector("[data-invoice-placeholder]");
 		var invoiceFrame = checkoutPage.querySelector("[data-invoice-frame]");
 		var cardFields = checkoutPage.querySelector("[data-card-fields]");
+		var cardInputs = cardFields ? Array.prototype.slice.call(cardFields.querySelectorAll("input, select, textarea")) : [];
 		var checkoutMessage = checkoutPage.querySelector("[data-checkout-message]");
 		var confirmationOrder = checkoutPage.querySelector("[data-confirmation-order]");
 		var currentStepIndex = 0;
