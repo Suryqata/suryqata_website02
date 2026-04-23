@@ -1,0 +1,77 @@
+<section id="auth" data-auth-page>
+  <div class="auth-shell">
+    <div class="auth-main">
+      <p class="auth-kicker">Account access</p>
+      <h2>Sign in or create an account</h2>
+      <p>
+        Use an account to return later, or continue as a guest if you only want a simple checkout session.
+      </p>
+
+      <div class="auth-switcher" role="tablist" aria-label="Choose authentication mode">
+        <button type="button" class="is-active" data-auth-mode="login">Sign In</button>
+        <button type="button" data-auth-mode="register">Create Account</button>
+      </div>
+
+      <form class="auth-form" data-auth-form="login">
+        <label class="auth-field">
+          <span>Email address</span>
+          <input type="email" name="email" placeholder="name@example.com" required />
+        </label>
+        <label class="auth-field">
+          <span>Password</span>
+          <input type="password" name="password" placeholder="Your password" required />
+        </label>
+        <button type="submit" class="auth-submit">Sign In</button>
+      </form>
+
+      <form class="auth-form" data-auth-form="register" hidden>
+        <label class="auth-field">
+          <span>Full name</span>
+          <input type="text" name="name" placeholder="Your full name" required />
+        </label>
+        <label class="auth-field">
+          <span>Email address</span>
+          <input type="email" name="email" placeholder="name@example.com" required />
+        </label>
+        <label class="auth-field">
+          <span>Password</span>
+          <input type="password" name="password" placeholder="At least 8 characters" required />
+        </label>
+        <label class="auth-field">
+          <span>Confirm password</span>
+          <input type="password" name="confirmPassword" placeholder="Repeat your password" required />
+        </label>
+        <button type="submit" class="auth-submit">Create Account</button>
+      </form>
+
+      <p class="auth-message" data-auth-message></p>
+    </div>
+
+    <aside class="auth-side">
+      <div class="auth-side-card">
+        <p class="auth-kicker">Guest checkout</p>
+        <h3>Continue without an account</h3>
+        <p>
+          You can keep browsing and checking out without saving a password. Your cart and checkout progress will still
+          work in this browser.
+        </p>
+        <label class="auth-field">
+          <span>Guest name</span>
+          <input type="text" name="guestName" placeholder="Guest name (optional)" />
+        </label>
+        <button type="button" class="auth-guest-button" data-auth-guest>Continue as Guest</button>
+      </div>
+
+      <div class="auth-session-card" data-auth-session hidden>
+        <p class="auth-kicker">Current session</p>
+        <p data-auth-session-copy></p>
+        <div class="auth-session-actions">
+          <button type="button" class="auth-session-button" data-auth-session-continue>Continue</button>
+          <button type="button" class="auth-session-button is-secondary" data-auth-session-logout>
+            Log Out
+          </button>
+        </div>
+      </div>
+    </aside>
+  </div>
+</section>
