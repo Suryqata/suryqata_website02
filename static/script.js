@@ -481,71 +481,33 @@ document.addEventListener("DOMContentLoaded", function () {
 		var reviewDelivery = checkoutPage.querySelector("[data-review-delivery]");
 		var reviewPayment = checkoutPage.querySelector("[data-review-payment]");
 		var reviewNotes = checkoutPage.querySelector("[data-review-notes]");
-		var invoicePreviewButton = checkoutPage.querySelector("[data-invoice-preview]");
-		var invoiceDownloadButton = checkoutPage.querySelector("[data-invoice-download]");
-		var invoiceStatus = checkoutPage.querySelector("[data-invoice-status]");
-		var invoicePlaceholder = checkoutPage.querySelector("[data-invoice-placeholder]");
-		var invoiceFrame = checkoutPage.querySelector("[data-invoice-frame]");
-		var cardFields = checkoutPage.querySelector("[data-card-fields]");
-		var cardInputs = cardFields ? Array.prototype.slice.call(cardFields.querySelectorAll("input, select, textarea")) : [];
 		var checkoutMessage = checkoutPage.querySelector("[data-checkout-message]");
 		var confirmationOrder = checkoutPage.querySelector("[data-confirmation-order]");
 		var currentStepIndex = 0;
-		var invoicePreviewUrl = "";
-		var invoiceNumber = "";
 		var placedOrder = null;
 
 		populateCheckoutForm(form, loadCheckoutState());
-		updatePaymentFields();
+		ensureStripePaymentMethod();
 		renderCheckoutSummary();
 		renderCheckoutReview();
-		resetInvoicePreview();
-		updateInvoiceActionState();
 		updateCheckoutStep();
 
 		if (form) {
 			form.addEventListener("input", function () {
+				ensureStripePaymentMethod();
 				persistCheckoutState(collectCheckoutData(form));
 				renderCheckoutReview();
-				updateInvoiceActionState();
 				updateCheckoutStep();
 			});
 
 			form.addEventListener("change", function (event) {
 				if (event.target.name === "paymentMethod") {
-					updatePaymentFields();
+					ensureStripePaymentMethod();
 				}
 
 				persistCheckoutState(collectCheckoutData(form));
 				renderCheckoutReview();
-				updateInvoiceActionState();
 				updateCheckoutStep();
-			});
-		}
-
-		if (invoicePreviewButton) {
-			invoicePreviewButton.addEventListener("click", function () {
-				if (!placedOrder || !placedOrder.items.length) {
-					setInvoiceStatus("Invoice will become available after placing your order.");
-					return;
-				}
-
-				clearCheckoutMessage();
-				renderInvoicePreview();
-			});
-		}
-
-		if (invoiceDownloadButton) {
-			invoiceDownloadButton.addEventListener("click", function () {
-				var invoiceDocument = buildInvoiceDocument();
-				var formData = placedOrder ? placedOrder.formData : collectCheckoutData(form);
-
-				if (!invoiceDocument) {
-					return;
-				}
-
-				invoiceDocument.save(getInvoiceFilename(formData));
-				setInvoiceStatus("Invoice downloaded.");
 			});
 		}
 
@@ -708,7 +670,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			}
 
 			if (stepIndex === 2) {
-				updatePaymentFields();
+				ensureStripePaymentMethod();
 			}
 
 			fields = Array.prototype.slice.call(step.querySelectorAll("input, select, textarea"))
@@ -793,8 +755,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
 			if (reviewPayment) {
 				reviewPayment.innerHTML = [
-					'<p><strong>Method:</strong> ' + escapeHtml(formData.paymentMethod || 'Not selected yet') + '</p>',
-					'<p><strong>Card holder:</strong> ' + escapeHtml(formData.cardHolder || 'Not needed or not added') + '</p>'
+					'<p><strong>Method:</strong> ' + escapeHtml(formData.paymentMethod || 'Stripe') + '</p>',
+					'<p><strong>Processor:</strong> Stripe</p>'
 				].join('');
 			}
 
@@ -806,238 +768,18 @@ document.addEventListener("DOMContentLoaded", function () {
 			}
 		}
 
-		function getInvoiceTotals(items) {
-			var lineItems = items || [];
+		function ensureStripePaymentMethod() {
+			var paymentField;
 
-			return {
-				itemCount: lineItems.reduce(function (sum, entry) {
-					return sum + (entry && entry.quantity ? entry.quantity : 0);
-				}, 0),
-				subtotal: lineItems.reduce(function (sum, entry) {
-					return sum + getItemTotal(entry);
-				}, 0)
-			};
-		}
-
-		function setInvoiceStatus(message) {
-			if (invoiceStatus) {
-				invoiceStatus.textContent = message;
-			}
-		}
-
-		function getInvoiceFilename(formData) {
-			var customerSlug = formData && formData.fullName ? slugify(formData.fullName) : "customer";
-			var orderRef = invoiceNumber || (placedOrder && placedOrder.orderNumber) || generateOrderNumber();
-			return "suryqata-invoice-" + customerSlug + "-" + orderRef + ".pdf";
-		}
-
-		function updateInvoiceActionState() {
-			var canGenerate = Boolean(placedOrder && placedOrder.items && placedOrder.items.length);
-
-			if (invoicePreviewButton) {
-				invoicePreviewButton.disabled = !canGenerate;
-			}
-
-			if (invoiceDownloadButton) {
-				invoiceDownloadButton.disabled = !canGenerate;
-			}
-		}
-
-		function resetInvoicePreview() {
-			if (invoicePreviewUrl) {
-				window.URL.revokeObjectURL(invoicePreviewUrl);
-				invoicePreviewUrl = "";
-			}
-
-			if (invoiceFrame) {
-				invoiceFrame.hidden = true;
-				invoiceFrame.removeAttribute("src");
-			}
-
-			if (invoicePlaceholder) {
-				invoicePlaceholder.hidden = false;
-			}
-
-			setInvoiceStatus("Your invoice is ready to preview and download.");
-		}
-
-		function renderInvoicePreview() {
-			var invoiceDocument = buildInvoiceDocument();
-			var blob;
-
-			if (!invoiceDocument || !invoiceFrame) {
+			if (!form) {
 				return;
 			}
 
-			blob = invoiceDocument.output("blob");
+			paymentField = form.querySelector('input[name="paymentMethod"]');
 
-			if (invoicePreviewUrl) {
-				window.URL.revokeObjectURL(invoicePreviewUrl);
+			if (paymentField) {
+				paymentField.value = 'Stripe';
 			}
-
-			invoicePreviewUrl = window.URL.createObjectURL(blob);
-			invoiceFrame.src = invoicePreviewUrl;
-			invoiceFrame.hidden = false;
-
-			if (invoicePlaceholder) {
-				invoicePlaceholder.hidden = true;
-			}
-
-			setInvoiceStatus("Invoice preview updated.");
-		}
-
-		function buildInvoiceDocument() {
-			var jsPDFRef = window.jspdf && window.jspdf.jsPDF;
-			var doc;
-			var sourceOrder = placedOrder;
-			var sourceItems;
-			var formData;
-			var totals;
-			var orderReference;
-			var orderDateText;
-			var y = 74;
-			var pageWidth = 595;
-			var bottomLimit = 780;
-
-			if (!jsPDFRef) {
-				setInvoiceStatus("Invoice preview is unavailable because jsPDF failed to load.");
-				setCheckoutMessage("Unable to generate invoice preview right now.");
-				return null;
-			}
-
-			if (!sourceOrder || !sourceOrder.items || !sourceOrder.items.length) {
-				setInvoiceStatus("Place an order first to generate the final invoice.");
-				return null;
-			}
-
-			doc = new jsPDFRef({
-				unit: "pt",
-				format: "a4"
-			});
-			sourceItems = sourceOrder.items;
-			formData = sourceOrder.formData || {};
-			totals = getInvoiceTotals(sourceItems);
-			orderReference = sourceOrder.orderNumber || invoiceNumber || generateOrderNumber();
-			orderDateText = sourceOrder.placedAt ? new Date(sourceOrder.placedAt).toLocaleDateString("en-IE") : new Date().toLocaleDateString("en-IE");
-
-			doc.setFontSize(22);
-			doc.text("Suryqata", 48, y);
-			doc.setFontSize(12);
-			doc.text("Invoice", 48, y + 20);
-			doc.setFontSize(10);
-			doc.text("Invoice #: " + orderReference, pageWidth - 48, y, { align: "right" });
-			doc.text("Date: " + orderDateText, pageWidth - 48, y + 16, { align: "right" });
-
-			y += 56;
-			doc.setDrawColor(210, 210, 210);
-			doc.line(48, y, pageWidth - 48, y);
-			y += 26;
-
-			doc.setFontSize(11);
-			doc.text("Billing details", 48, y);
-			y += 16;
-			doc.setFontSize(10);
-			doc.text(doc.splitTextToSize(formData.fullName || "Not provided", 250), 48, y);
-			y += 14;
-			doc.text(doc.splitTextToSize(formData.email || "No email provided", 250), 48, y);
-			y += 14;
-			doc.text(doc.splitTextToSize(formData.phone || "No phone provided", 250), 48, y);
-			y += 14;
-			doc.text(doc.splitTextToSize(joinValues([
-				formData.addressLine1,
-				formData.addressLine2,
-				formData.city,
-				formData.postcode,
-				formData.country
-			], ", ") || "No address provided", 250), 48, y);
-
-			doc.setFontSize(11);
-			doc.text("Delivery", 330, y - 42);
-			doc.setFontSize(10);
-			doc.text(doc.splitTextToSize(formData.shippingMethod || "Not selected", 200), 330, y - 26);
-			doc.text(doc.splitTextToSize("Payment: " + (formData.paymentMethod || "Not selected"), 200), 330, y - 10);
-
-			y += 30;
-			doc.line(48, y, pageWidth - 48, y);
-			y += 22;
-
-			doc.setFontSize(11);
-			doc.text("Items", 48, y);
-			doc.text("Amount", pageWidth - 48, y, { align: "right" });
-			y += 14;
-			doc.line(48, y, pageWidth - 48, y);
-			y += 16;
-
-			sourceItems.forEach(function (entry) {
-				var description = [
-					(entry.title || "Artwork"),
-					"(" + (entry.size || "Medium") + ")",
-					"x" + (entry.quantity || 1)
-				].join(" ");
-				var descriptionLines = doc.splitTextToSize(description, 360);
-				var blockHeight = descriptionLines.length * 14 + 6;
-
-				if (y + blockHeight > bottomLimit) {
-					doc.addPage();
-					y = 72;
-					doc.setFontSize(11);
-					doc.text("Items (continued)", 48, y);
-					doc.text("Amount", pageWidth - 48, y, { align: "right" });
-					y += 14;
-					doc.line(48, y, pageWidth - 48, y);
-					y += 16;
-				}
-
-				doc.setFontSize(10);
-				doc.text(descriptionLines, 48, y);
-				doc.text(formatPrice(getItemTotal(entry)), pageWidth - 48, y, { align: "right" });
-				y += blockHeight;
-			});
-
-			y += 8;
-			if (y + 72 > bottomLimit) {
-				doc.addPage();
-				y = 72;
-			}
-
-			doc.line(48, y, pageWidth - 48, y);
-			y += 18;
-			doc.setFontSize(10);
-			doc.text("Items count: " + totals.itemCount, 48, y);
-			doc.text("Subtotal: " + formatPrice(totals.subtotal), pageWidth - 48, y, { align: "right" });
-			y += 18;
-			doc.setFontSize(12);
-			doc.text("Total: " + formatPrice(totals.subtotal), pageWidth - 48, y, { align: "right" });
-
-			if (formData.orderNotes) {
-				y += 28;
-				if (y + 48 > bottomLimit) {
-					doc.addPage();
-					y = 72;
-				}
-
-				doc.setFontSize(11);
-				doc.text("Order note", 48, y);
-				y += 14;
-				doc.setFontSize(10);
-				doc.text(doc.splitTextToSize(formData.orderNotes, pageWidth - 96), 48, y);
-			}
-
-			return doc;
-		}
-
-		function updatePaymentFields() {
-			var selectedMethod = form && form.querySelector('input[name="paymentMethod"]:checked');
-			var requiresCard = selectedMethod && selectedMethod.value === 'Card';
-
-			if (cardFields) {
-				cardFields.hidden = !requiresCard;
-			}
-
-			cardInputs.forEach(function (input) {
-				input.disabled = !requiresCard;
-				input.required = requiresCard;
-			});
 		}
 
 		function setCheckoutMessage(message) {
@@ -1055,74 +797,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	function initializeThankYouPage() {
 		var orderReference = thankYouPage.querySelector("[data-confirmation-order]");
-		var invoicePreviewButton = thankYouPage.querySelector("[data-invoice-preview]");
-		var invoiceDownloadButton = thankYouPage.querySelector("[data-invoice-download]");
-		var invoiceStatus = thankYouPage.querySelector("[data-invoice-status]");
-		var invoicePlaceholder = thankYouPage.querySelector("[data-invoice-placeholder]");
-		var invoiceFrame = thankYouPage.querySelector("[data-invoice-frame]");
 		var order = loadLatestOrder();
 		var sessionId = new URLSearchParams(window.location.search).get("session_id") || "";
-		var invoicePreviewUrl = "";
-
-		function setThankYouUnavailable(statusText, placeholderText) {
-			if (orderReference) {
-				orderReference.textContent = "Unavailable";
-			}
-
-			if (invoiceStatus) {
-				invoiceStatus.textContent = statusText;
-			}
-
-			if (invoicePlaceholder) {
-				invoicePlaceholder.textContent = placeholderText;
-			}
-
-			if (invoicePreviewButton) {
-				invoicePreviewButton.disabled = true;
-			}
-
-			if (invoiceDownloadButton) {
-				invoiceDownloadButton.disabled = true;
-			}
-		}
-
-		function setThankYouReady(statusText) {
-			if (orderReference) {
-				orderReference.textContent = order.orderNumber || generateOrderNumber();
-			}
-
-			if (invoiceStatus) {
-				invoiceStatus.textContent = statusText;
-			}
-
-			if (invoicePreviewButton) {
-				invoicePreviewButton.disabled = false;
-			}
-
-			if (invoiceDownloadButton) {
-				invoiceDownloadButton.disabled = false;
-			}
-		}
 
 		if (sessionId) {
-			if (invoiceStatus) {
-				invoiceStatus.textContent = "Verifying your Stripe payment...";
-			}
-
-			if (invoicePreviewButton) {
-				invoicePreviewButton.disabled = true;
-			}
-
-			if (invoiceDownloadButton) {
-				invoiceDownloadButton.disabled = true;
-			}
-
 			requestJson("/api/payments/session?session_id=" + encodeURIComponent(sessionId)).then(function (response) {
 				if (!response.ok || !response.data || !response.data.items || !response.data.items.length) {
-					setThankYouUnavailable(
-						response.error || "We could not verify the Stripe payment.",
-						"Payment verification failed. Return to checkout and try again."
-					);
+					if (orderReference) {
+						orderReference.textContent = "Unavailable";
+					}
 					return;
 				}
 
@@ -1132,70 +815,19 @@ document.addEventListener("DOMContentLoaded", function () {
 				persistCart();
 				persistCheckoutState({});
 				renderCart();
-				setThankYouReady("Your Stripe payment was confirmed. Your invoice is ready to preview and download.");
+
+				if (orderReference) {
+					orderReference.textContent = order.orderNumber || generateOrderNumber();
+				}
 			}).catch(function () {
-				setThankYouUnavailable(
-					"We could not reach the payment verification server.",
-					"Payment verification failed. Return to checkout and try again."
-				);
-			});
-		} else if (!order || !order.items || !order.items.length) {
-			setThankYouUnavailable(
-				"No recent order was found. Place a new order to generate an invoice.",
-				"No invoice is available yet."
-			);
-		} else {
-			setThankYouReady("Your invoice is ready to preview and download.");
-		}
-
-		if (invoicePreviewButton) {
-			invoicePreviewButton.addEventListener("click", function () {
-				var invoiceDocument = createInvoiceDocumentFromOrder(order);
-				var blob;
-
-				if (!invoiceDocument || !invoiceFrame) {
-					if (invoiceStatus) {
-						invoiceStatus.textContent = "Unable to generate invoice preview right now.";
-					}
-					return;
-				}
-
-				blob = invoiceDocument.output("blob");
-
-				if (invoicePreviewUrl) {
-					window.URL.revokeObjectURL(invoicePreviewUrl);
-				}
-
-				invoicePreviewUrl = window.URL.createObjectURL(blob);
-				invoiceFrame.src = invoicePreviewUrl;
-				invoiceFrame.hidden = false;
-
-				if (invoicePlaceholder) {
-					invoicePlaceholder.hidden = true;
-				}
-
-				if (invoiceStatus) {
-					invoiceStatus.textContent = "Invoice preview updated.";
+				if (orderReference) {
+					orderReference.textContent = "Unavailable";
 				}
 			});
-		}
-
-		if (invoiceDownloadButton) {
-			invoiceDownloadButton.addEventListener("click", function () {
-				var invoiceDocument = createInvoiceDocumentFromOrder(order);
-
-				if (!invoiceDocument) {
-					if (invoiceStatus) {
-						invoiceStatus.textContent = "Unable to generate invoice download right now.";
-					}
-					return;
-				}
-
-				invoiceDocument.save(getInvoiceFilenameFromOrder(order));
-				if (invoiceStatus) {
-					invoiceStatus.textContent = "Invoice downloaded.";
-				}
-			});
+		} else if (order && order.orderNumber) {
+			if (orderReference) {
+				orderReference.textContent = order.orderNumber;
+			}
 		}
 	}
 
@@ -1272,146 +904,13 @@ document.addEventListener("DOMContentLoaded", function () {
 		}
 	}
 
-	function getInvoiceFilenameFromOrder(order) {
-		var customerSlug = order && order.formData && order.formData.fullName ? slugify(order.formData.fullName) : "customer";
-		var orderRef = order && order.orderNumber ? order.orderNumber : generateOrderNumber();
-		return "suryqata-invoice-" + customerSlug + "-" + orderRef + ".pdf";
-	}
-
-	function createInvoiceDocumentFromOrder(order) {
-		var jsPDFRef = window.jspdf && window.jspdf.jsPDF;
-		var doc;
-		var sourceItems;
-		var formData;
-		var totals;
-		var orderReference;
-		var orderDateText;
-		var y = 74;
-		var pageWidth = 595;
-		var bottomLimit = 780;
-
-		if (!jsPDFRef || !order || !order.items || !order.items.length) {
+	function loadLatestOrder() {
+		try {
+			var savedOrder = window.localStorage.getItem(latestOrderKey);
+			return savedOrder ? JSON.parse(savedOrder) : null;
+		} catch (error) {
 			return null;
 		}
-
-		doc = new jsPDFRef({
-			unit: "pt",
-			format: "a4"
-		});
-		sourceItems = order.items;
-		formData = order.formData || {};
-		totals = sourceItems.reduce(function (acc, entry) {
-			acc.itemCount += entry && entry.quantity ? entry.quantity : 0;
-			acc.subtotal += getItemTotal(entry);
-			return acc;
-		}, { itemCount: 0, subtotal: 0 });
-		orderReference = order.orderNumber || generateOrderNumber();
-		orderDateText = order.placedAt ? new Date(order.placedAt).toLocaleDateString("en-IE") : new Date().toLocaleDateString("en-IE");
-
-		doc.setFontSize(22);
-		doc.text("Suryqata", 48, y);
-		doc.setFontSize(12);
-		doc.text("Invoice", 48, y + 20);
-		doc.setFontSize(10);
-		doc.text("Invoice #: " + orderReference, pageWidth - 48, y, { align: "right" });
-		doc.text("Date: " + orderDateText, pageWidth - 48, y + 16, { align: "right" });
-
-		y += 56;
-		doc.setDrawColor(210, 210, 210);
-		doc.line(48, y, pageWidth - 48, y);
-		y += 26;
-
-		doc.setFontSize(11);
-		doc.text("Billing details", 48, y);
-		y += 16;
-		doc.setFontSize(10);
-		doc.text(doc.splitTextToSize(formData.fullName || "Not provided", 250), 48, y);
-		y += 14;
-		doc.text(doc.splitTextToSize(formData.email || "No email provided", 250), 48, y);
-		y += 14;
-		doc.text(doc.splitTextToSize(formData.phone || "No phone provided", 250), 48, y);
-		y += 14;
-		doc.text(doc.splitTextToSize(joinValues([
-			formData.addressLine1,
-			formData.addressLine2,
-			formData.city,
-			formData.postcode,
-			formData.country
-		], ", ") || "No address provided", 250), 48, y);
-
-		doc.setFontSize(11);
-		doc.text("Delivery", 330, y - 42);
-		doc.setFontSize(10);
-		doc.text(doc.splitTextToSize(formData.shippingMethod || "Not selected", 200), 330, y - 26);
-		doc.text(doc.splitTextToSize("Payment: " + (formData.paymentMethod || "Not selected"), 200), 330, y - 10);
-
-		y += 30;
-		doc.line(48, y, pageWidth - 48, y);
-		y += 22;
-
-		doc.setFontSize(11);
-		doc.text("Items", 48, y);
-		doc.text("Amount", pageWidth - 48, y, { align: "right" });
-		y += 14;
-		doc.line(48, y, pageWidth - 48, y);
-		y += 16;
-
-		sourceItems.forEach(function (entry) {
-			var description = [
-				(entry.title || "Artwork"),
-				"(" + (entry.size || "Medium") + ")",
-				"x" + (entry.quantity || 1)
-			].join(" ");
-			var descriptionLines = doc.splitTextToSize(description, 360);
-			var blockHeight = descriptionLines.length * 14 + 6;
-
-			if (y + blockHeight > bottomLimit) {
-				doc.addPage();
-				y = 72;
-				doc.setFontSize(11);
-				doc.text("Items (continued)", 48, y);
-				doc.text("Amount", pageWidth - 48, y, { align: "right" });
-				y += 14;
-				doc.line(48, y, pageWidth - 48, y);
-				y += 16;
-			}
-
-			doc.setFontSize(10);
-			doc.text(descriptionLines, 48, y);
-			doc.text(formatPrice(getItemTotal(entry)), pageWidth - 48, y, { align: "right" });
-			y += blockHeight;
-		});
-
-		y += 8;
-		if (y + 72 > bottomLimit) {
-			doc.addPage();
-			y = 72;
-		}
-
-		doc.line(48, y, pageWidth - 48, y);
-		y += 18;
-		doc.setFontSize(10);
-		doc.text("Items count: " + totals.itemCount, 48, y);
-		doc.text("Subtotal: " + formatPrice(totals.subtotal), pageWidth - 48, y, { align: "right" });
-		y += 18;
-		doc.setFontSize(12);
-		doc.text("Total: " + formatPrice(totals.subtotal), pageWidth - 48, y, { align: "right" });
-
-		if (formData.orderNotes) {
-			y += 28;
-			if (y + 48 > bottomLimit) {
-				doc.addPage();
-				y = 72;
-			}
-
-			doc.setFontSize(11);
-			doc.text("Order note", 48, y);
-			y += 14;
-			doc.setFontSize(10);
-			doc.text(doc.splitTextToSize(formData.orderNotes, pageWidth - 96), 48, y);
-		}
-
-		return doc;
 	}
 
 	function collectCheckoutData(form) {

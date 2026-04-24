@@ -111,31 +111,12 @@
             <h3>Payment method</h3>
             <p>Stripe will securely process your card payment after you review the order.</p>
           </div>
+          <input type="hidden" name="paymentMethod" value="Stripe" />
           <div class="checkout-choice-grid">
-            <label class="checkout-choice-card">
-              <input type="radio" name="paymentMethod" value="Card" required checked />
-              <span>Card via Stripe</span>
+            <div class="checkout-choice-card">
+              <span>Stripe</span>
               <small>Pay securely with Visa or Mastercard on Stripe.</small>
-            </label>
-          </div>
-
-          <div class="checkout-field-grid checkout-spacing-top" data-card-fields hidden>
-            <label class="checkout-field checkout-field-full">
-              <span>Name on card</span>
-              <input type="text" name="cardHolder" placeholder="Card holder name" />
-            </label>
-            <label class="checkout-field checkout-field-full">
-              <span>Card number</span>
-              <input type="text" name="cardNumber" inputmode="numeric" placeholder="1234 5678 9012 3456" />
-            </label>
-            <label class="checkout-field">
-              <span>Expiry</span>
-              <input type="text" name="cardExpiry" placeholder="MM/YY" />
-            </label>
-            <label class="checkout-field">
-              <span>CVV</span>
-              <input type="text" name="cardCvv" inputmode="numeric" placeholder="123" />
-            </label>
+            </div>
           </div>
         </section>
 
@@ -194,26 +175,7 @@
     <p class="checkout-kicker">Order placed</p>
     <h3>Thank you for your order</h3>
     <p>Your reference number is <strong data-confirmation-order></strong>.</p>
-    <p>
-      We have stored your checkout details locally in the browser during the process, and the cart has now been
-      cleared.
-    </p>
-    <div class="checkout-invoice-panel checkout-spacing-top">
-      <div class="checkout-invoice-head">
-        <h4>Invoice</h4>
-        <p data-invoice-status>Your invoice is ready to preview and download.</p>
-      </div>
-      <div class="checkout-invoice-actions">
-        <button type="button" class="checkout-secondary-button" data-invoice-preview>View invoice</button>
-        <button type="button" class="checkout-secondary-button" data-invoice-download>Download PDF</button>
-      </div>
-      <div class="checkout-invoice-viewer">
-        <p class="checkout-invoice-placeholder" data-invoice-placeholder>
-          Click "View invoice" to open the final invoice preview.
-        </p>
-        <iframe title="Invoice preview" data-invoice-frame hidden></iframe>
-      </div>
-    </div>
+    <p>Your payment was processed by Stripe. A receipt will be sent to your email.</p>
     <div class="checkout-confirmation-actions">
       <a href="/gallery.html" class="checkout-primary-link">Continue shopping</a>
       <a href="/" class="checkout-secondary-link">Back to home</a>

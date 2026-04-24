@@ -16,10 +16,14 @@ function getUnitAmount(size) {
 }
 
 export function getStripeClient() {
-  const secretKey = process.env.STRIPE_SECRET_KEY || '';
+  const secretKey = String(process.env.STRIPE_SECRET_KEY || '').trim();
 
   if (!secretKey) {
     throw new Error('Stripe is not configured. Set STRIPE_SECRET_KEY in the server environment.');
+  }
+
+  if (!secretKey.startsWith('sk_')) {
+    throw new Error('Invalid STRIPE_SECRET_KEY: expected a Stripe secret key starting with sk_.');
   }
 
   return new Stripe(secretKey);
