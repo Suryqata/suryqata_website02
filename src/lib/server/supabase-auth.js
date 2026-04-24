@@ -6,7 +6,12 @@ const SUPABASE_ACCESS_COOKIE = 'suryqata_supabase_access';
 const SUPABASE_REFRESH_COOKIE = 'suryqata_supabase_refresh';
 
 const supabaseUrl = privateEnv.SUPABASE_URL || publicEnv.PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = privateEnv.SUPABASE_ANON_KEY || publicEnv.PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseAnonKey =
+  privateEnv.SUPABASE_ANON_KEY ||
+  privateEnv.SUPABASE_PUBLISHABLE_KEY ||
+  publicEnv.PUBLIC_SUPABASE_ANON_KEY ||
+  publicEnv.PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  '';
 
 export const hasSupabaseAuthConfig = Boolean(supabaseUrl && supabaseAnonKey);
 
