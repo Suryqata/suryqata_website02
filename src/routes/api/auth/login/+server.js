@@ -1,37 +1,55 @@
 import { json } from '@sveltejs/kit';
+import { clearSessionCookie } from '$lib/server/auth-db';
 import {
-  createSession,
-  findUserByEmail,
+  clearSupabaseSessionCookies,
+  createSupabaseServerClient,
+  hasSupabaseAuthConfig,
+  isValidEmail,
   normalizeEmail,
-  setSessionCookie,
-  verifyPassword
-} from '$lib/server/auth-db';
+  setSupabaseSessionCookies
+} from '$lib/server/supabase-auth';
 
 export async function POST({ request, cookies }) {
+  if (!hasSupabaseAuthConfig) {
+    return json({ error: 'Supabase auth is not configured on this server.' }, { status: 503 });
+  }
+
   const body = await request.json().catch(() => ({}));
   const email = normalizeEmail(body?.email);
   const password = String(body?.password || '');
-  const user = findUserByEmail(email);
 
-  if (!user || !verifyPassword(password, user.password_hash)) {
+  if (!isValidEmail(email)) {
+    return json({ error: 'Please enter a valid email address.' }, { status: 400 });
+  }
+
+  if (!password) {
+    return json({ error: 'Please enter your password.' }, { status: 400 });
+  }
+
+  const supabase = createSupabaseServerClient();
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if (error || !data?.session || !data?.user) {
     return json({ error: 'Incorrect email or password.' }, { status: 401 });
   }
 
-  const session = createSession({
-    userId: user.id,
-    mode: 'user',
-    displayName: user.name,
-    email: user.email
-  });
+  clearSessionCookie(cookies);
+  clearSupabaseSessionCookies(cookies);
+  setSupabaseSessionCookies(cookies, data.session);
 
-  setSessionCookie(cookies, session.id, session.expires_at);
+  const user = data.user;
+  const profileName = String(user.user_metadata?.full_name || user.user_metadata?.name || '').trim();
+  const displayName = profileName || String(user.email || '').split('@')[0] || 'Account';
 
   return json({
     data: {
       authenticated: true,
-      mode: session.mode,
-      displayName: session.display_name,
-      email: session.email
+      mode: 'user',
+      displayName,
+      email: user.email || ''
     }
   });
 }
