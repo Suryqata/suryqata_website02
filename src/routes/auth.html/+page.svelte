@@ -77,7 +77,7 @@
     event.preventDefault();
 
     if (!hasSupabaseEnv) {
-      setMessage('Supabase env vars are missing. Configure PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_ANON_KEY.', true);
+      setMessage('Supabase env vars are missing. Configure PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_PUBLISHABLE_KEY.', true);
       return;
     }
 
@@ -108,7 +108,7 @@
     event.preventDefault();
 
     if (!hasSupabaseEnv) {
-      setMessage('Supabase env vars are missing. Configure PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_ANON_KEY.', true);
+      setMessage('Supabase env vars are missing. Configure PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_PUBLISHABLE_KEY.', true);
       return;
     }
 
